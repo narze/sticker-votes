@@ -49,6 +49,10 @@
     votesByChoices = votesByChoicesTemp
   }
 
+  $: pageCount = Object.entries(room.pages).length
+  $: hasPrevPage = pageIndex > 0
+  $: hasNextPage = pageIndex < pageCount - 1
+
   const unsub = onSnapshot(roomRef, (querySnapshot) => {
     room = querySnapshot.data() as Room
   })
@@ -57,11 +61,23 @@
     unsub()
   })
 
-  // Active for 5 minutes only, to save quotas,
+  // Active for 10 minutes only, to save quotas,
   setTimeout(() => {
     active = false
     unsub()
-  }, 5 * 60 * 1000)
+  }, 10 * 60 * 1000)
+
+  function prevPage() {
+    if (!hasPrevPage) return
+
+    pageIndex -= 1
+  }
+
+  function nextPage() {
+    if (!hasNextPage) return
+
+    pageIndex += 1
+  }
 
   async function submitVote(e, choice: string) {
     if (!active) {
@@ -74,7 +90,7 @@
 
     await upsert(choice)
 
-    alert("ขอบคุณสำหรับการโหวต!")
+    // alert("ขอบคุณสำหรับการโหวต!")
   }
 
   async function upsert(choice) {
@@ -106,9 +122,11 @@
   </h1>
 
   <h2 class="text-2xl">Room: {room.name}</h2>
-  <h2 class="text-xl">Page: {page.name}</h2>
-
-  <!-- <div class="fixed">x: {x}, y: {y}, value: {value}</div> -->
+  <h2 class="text-xl">
+    {#if hasPrevPage}<button class="text-red-700 text-3xl" on:click={prevPage}>◀</button>{/if}
+    {page.name}
+    {#if hasNextPage}<button class="text-red-700 text-3xl" on:click={nextPage}>▶</button>{/if}
+  </h2>
 
   <div class="flex-grow w-full flex flex-col md:flex-row">
     {#each choices as choice, idx}
@@ -138,10 +156,10 @@
   }
 
   .sticker {
-    margin-top: -1rem;
-    margin-left: -1rem;
-    height: 2rem;
-    width: 2rem;
+    margin-top: -2rem;
+    margin-left: -2rem;
+    height: 4rem;
+    width: 4rem;
     background-color: lime;
     border-color: limegreen;
     border-width: 2px;
@@ -150,10 +168,10 @@
 
   @media (max-width: 768px) {
     .sticker {
-      margin-top: -0.75rem;
-      margin-left: -0.75rem;
-      height: 1.5rem;
-      width: 1.5rem;
+      margin-top: -1rem;
+      margin-left: -1rem;
+      height: 2rem;
+      width: 2rem;
       border-width: 1px;
     }
   }
