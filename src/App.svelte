@@ -1,159 +1,114 @@
-<script lang="ts">
-  import "twind/shim"
-  import { tw } from "twind"
-  import logo from "./assets/svelte.png"
-  import Head from "./lib/Head.svelte"
-  import Kofi from "./lib/Kofi.svelte"
-  import Menu from "./lib/Menu.svelte"
-  import Social from "./lib/Social.svelte"
-  import { db } from "./lib/firebase"
-  import { collection, onSnapshot, doc, query, limit, setDoc, updateDoc } from "firebase/firestore"
+<script type="ts">
+  import { doc, setDoc } from "firebase/firestore"
   import { nanoid } from "nanoid"
-  import { onDestroy } from "svelte"
 
-  const url = "https://sticker-vote.vercel.app"
-  const title = "Sticker Vote"
+  import { tick } from "svelte"
 
-  const localStorageKey = "sticker-vote"
+  import "twind/shim"
+  import { db } from "./lib/firebase"
 
-  const menuItems = [{ name: "Github", url: "https://github.com/narze/sticker-vote" }]
+  import url from "./lib/url"
+  import Room from "./Room.svelte"
 
-  const description = ""
-  const imageUrl =
-    "https://raw.githubusercontent.com/narze/timelapse/master/projects/sticker-vote_home.png"
-  const gtagId = null
-  const id = localStorage.getItem(localStorageKey) || nanoid()
-
-  localStorage.setItem(localStorageKey, id)
-
-  let x, y, value
-  let troublesomeEntries: Array<{ x: number; y: number; id: string }> = []
-  let notTroublesomeEntries: Array<{ x: number; y: number; id: string }> = []
-  let active = true
-  let room: Room = { name: "Loading...", pages: {} }
-  let pageIndex = 0
-  let votesByChoices: Record<string, Array<{ id: string; x: number; y: number }>> = {}
-  let roomKey = "SNfjJdRJGeM2lfDN27vz-test"
-  let roomRef = doc(db, "rooms", roomKey)
-
-  $: page = (room.pages[pageIndex] || {}) as Page
-  $: choices = page.choices || []
-  $: votes = page.votes || {}
-  $: {
-    const votesByChoicesTemp = {}
-    choices.forEach((choice) => (votesByChoicesTemp[choice] = []))
-    Object.entries(votes).forEach(([userId, vote]) => {
-      votesByChoicesTemp[vote.choice].push({ id: userId, x: vote.x, y: vote.y })
-    })
-    votesByChoices = votesByChoicesTemp
+  const defaultPage: Page = {
+    name: "Page Name",
+    choices: ["A", "B"],
+    votes: {},
   }
 
-  const unsub = onSnapshot(roomRef, (querySnapshot) => {
-    room = querySnapshot.data() as Room
-  })
+  let roomName = "Room Name"
+  let pages = [pageClone()]
 
-  onDestroy(() => {
-    unsub()
-  })
-
-  // Active for 5 minutes only, to save quotas,
-  setTimeout(() => {
-    active = false
-    unsub()
-  }, 5 * 60 * 1000)
-
-  async function submitVote(e, choice: string) {
-    if (!active) {
-      return
-    }
-
-    const rect = e.target.getBoundingClientRect()
-    x = ((e.clientX - rect.left) / rect.width) * 100
-    y = ((e.clientY - rect.top) / rect.height) * 100
-
-    await upsert(choice)
-
-    alert("ขอบคุณสำหรับการโหวต!")
+  function pageClone() {
+    return { ...defaultPage }
   }
 
-  async function upsert(choice) {
+  async function createRoom() {
+    // Create new doc
+    const room = { name: roomName, pages: { ...pages } }
+    console.log({ room })
+    // Redirect to hash
+    const roomKey = nanoid()
+    let roomRef = doc(db, "rooms", roomKey)
+
     try {
-      await updateDoc(roomRef, {
-        [`pages.${pageIndex}.votes.${id}`]: { x: round(x), y: round(y), choice },
-      })
+      await setDoc(roomRef, room)
 
-      // console.log("Document upserted with ID: ", id, { x, y, value })
+      console.log("Document created", { room, roomKey })
+
+      window.location.href = `/#/rooms/${roomKey}`
     } catch (e) {
       console.error("Error adding document: ", e)
     }
   }
 
-  function round(num, decimalPlaces = 3) {
-    var p = Math.pow(10, decimalPlaces)
-    return Math.round(num * p) / p
+  function addNewPage() {
+    pages = [...pages, pageClone()]
+  }
+
+  function removePage(idx) {
+    if (confirm("Delete page?")) {
+      pages = pages.splice(idx, 1)
+    }
+  }
+
+  function addNewChoice(pageIdx: number) {
+    pages[pageIdx].choices = [...pages[pageIdx].choices, ""]
+  }
+
+  function removeChoice(pageIdx: number, choiceIdx: number) {
+    pages[pageIdx].choices == pages[pageIdx].choices.splice(choiceIdx, 1)
+    pages = pages
   }
 </script>
 
-<!-- <Kofi name="narze" label="Support Me" /> -->
-<Menu items={menuItems} />
-<Social {url} {title} />
-<Head {title} {description} {url} {imageUrl} {gtagId} />
+{#if $url.hash.indexOf("#/rooms/") === 0}
+  <Room roomKey={$url.hash.split(["#/rooms/"])[1]} />
+{:else}
+  <main class="container mx-auto flex flex-col gap-4 py-4">
+    <h1 class="text-2xl">Create new room</h1>
 
-<main class="w-full h-screen p-2 flex flex-col items-center">
-  <h1 class="inline-block text-3xl sm:text-4xl md:text-6xl flex gap-3 mt-2 text-center">
-    Sticker Vote
-  </h1>
+    <input type="text" class="w-48 p-2 rounded" bind:value={roomName} placeholder="Room Name" />
 
-  <h2 class="text-2xl">Room: {room.name}</h2>
-  <h2 class="text-xl">Page: {page.name}</h2>
+    <h2>Pages</h2>
 
-  <!-- <div class="fixed">x: {x}, y: {y}, value: {value}</div> -->
-
-  <div class="flex-grow w-full flex flex-col md:flex-row">
-    {#each choices as choice, idx}
-      {@const votes = votesByChoices[choice]}
-      {#if idx > 0}
-        <span class="h-0.5 w-full md:w-0.5 md:h-full bg-black md:mt-14" />
-      {/if}
-      <div class="flex-grow text-center flex flex-col">
-        <p class="z-10 underline text-red-600 text-xl mt-4">{choice}</p>
-        <p class="z-10 mb-2 text-lg">{troublesomeEntries.length}</p>
-        <div on:click={(e) => submitVote(e, choice)} class="flex-grow mt-4 relative">
-          {#each votes as vote (vote.id)}
-            <div class="sticker absolute" style={`top: ${vote.y}%; left: ${vote.x}%; `}>
-              <!-- {entry.id} -->
-            </div>
-          {/each}
+    {#each pages as page, i (i)}
+      <div class="page border p-2 flex flex-col gap-2">
+        <div>
+          <input type="text" bind:value={page.name} placeholder="Page Name" />
+          <button class="border border-red-400 rounded px-1" on:click={() => removePage(i)}
+            >Delete Page</button
+          >
         </div>
+
+        <h3>Choices</h3>
+        {#each page.choices as choice, j (j)}
+          <div>
+            <input type="text" bind:value={choice} placeholder="Choice" />
+            <button class="border border-red-400 rounded px-2" on:click={() => removeChoice(i, j)}
+              >-</button
+            >
+          </div>
+        {/each}
+        <button class="w-32" on:click={() => addNewChoice(i)}>+ Choice</button>
       </div>
     {/each}
-  </div>
-</main>
+    <button class="w-32" on:click={addNewPage}>+ Page</button>
+
+    <button class="w-32" on:click={createRoom}>Create</button>
+  </main>
+{/if}
 
 <style>
-  :root {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
-      "Open Sans", "Helvetica Neue", sans-serif;
+  input {
+    border: 1px solid gray;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
   }
 
-  .sticker {
-    margin-top: -1rem;
-    margin-left: -1rem;
-    height: 2rem;
-    width: 2rem;
-    background-color: lime;
-    border-color: limegreen;
-    border-width: 2px;
-    border-radius: 50%;
-  }
-
-  @media (max-width: 768px) {
-    .sticker {
-      margin-top: -0.75rem;
-      margin-left: -0.75rem;
-      height: 1.5rem;
-      width: 1.5rem;
-      border-width: 1px;
-    }
+  button {
+    border: 1px solid gray;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
   }
 </style>
