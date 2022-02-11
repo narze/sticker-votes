@@ -118,7 +118,7 @@
 
 <main class="w-full h-screen p-2 flex flex-col items-center">
   <h1 class="inline-block text-3xl sm:text-4xl md:text-6xl flex gap-3 mt-2 text-center">
-    Sticker Vote
+    Sticker Votes
   </h1>
 
   <h2 class="text-2xl">Room: {room.name}</h2>
