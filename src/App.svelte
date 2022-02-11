@@ -7,71 +7,73 @@
   import Menu from "./lib/Menu.svelte"
   import Social from "./lib/Social.svelte"
   import { db } from "./lib/firebase"
-  import { collection, onSnapshot, doc, query, limit, setDoc, updateDoc } from "firebase/firestore"
+  import { collection, onSnapshot, doc, query, limit, setDoc } from "firebase/firestore"
   import { nanoid } from "nanoid"
 
-  const url = "https://troublesome-or-not.vercel.app"
-  const title = "คุณคิดว่า..."
+  const url = "https://sticker-vote.vercel.app"
+  const title = "Sticker Vote"
 
-  // const menuItems = [{ name: "Github", url: "https://github.com/narze/troublesome-or-not" }]
+  const localStorageKey = "sticker-vote"
+
+  const menuItems = [{ name: "Github", url: "https://github.com/narze/sticker-vote" }]
 
   const description = ""
   const imageUrl =
-    "https://raw.githubusercontent.com/narze/timelapse/master/projects/troublesome-or-not_home.png"
+    "https://raw.githubusercontent.com/narze/timelapse/master/projects/sticker-vote_home.png"
   const gtagId = null
-  const id = localStorage.getItem("ton-id") || nanoid()
+  const id = localStorage.getItem(localStorageKey) || nanoid()
 
-  localStorage.setItem("ton-id", id)
+  localStorage.setItem(localStorageKey, id)
 
   let x, y, value
   let troublesomeEntries: Array<{ x: number; y: number; id: string }> = []
   let notTroublesomeEntries: Array<{ x: number; y: number; id: string }> = []
   let active = true
+  let room: Room = { name: "Loading...", pages: {} }
+  let pageIndex = 0
+  let votesByChoices: Record<string, Array<{ id: string; x: number; y: number }>> = {}
+  let roomKey = "SNfjJdRJGeM2lfDN27vz-test"
+  let roomRef = doc(db, "rooms", roomKey)
 
-  // onSnapshot(query(collection(db, "votes"), limit(1000)), (querySnapshot) => {
-  //   const entries: Array<{ id: string; value: boolean; x: number; y: number }> = []
-
-  //   querySnapshot.forEach((doc) => {
-  //     entries.push({ id: doc.id, ...doc.data() } as unknown as any)
-  //   })
-  //   console.log("Current old ", entries)
-
-  //   const data = {}
-  //   entries.forEach(({ id, x, y, value }) => {
-  //     data[id] = { x: round(x), y: round(y), value }
-  //   })
-
-  //   setDoc(docRef, data, { merge: true })
-  // })
-
-  const date = new Date().toISOString().split("T")[0]
-  const docRef = doc(db, "votesMap", date)
-
-  const unsub = onSnapshot(query(collection(db, "votesMap")), (querySnapshot) => {
-    const entries: Record<string, { x: number; y: number; value: boolean }> = {}
-    const t: Array<{ x: number; y: number; id: string }> = []
-    const nt: Array<{ x: number; y: number; id: string }> = []
-
-    querySnapshot.forEach((doc) => {
-      Object.entries(doc.data()).forEach(([id, values]) => {
-        entries[id] = { id, ...values }
-      })
+  $: page = (room.pages[pageIndex] || {}) as Page
+  $: choices = page.choices || []
+  $: votes = page.votes || {}
+  $: {
+    const votesByChoicesTemp = {}
+    choices.forEach((choice) => (votesByChoicesTemp[choice] = []))
+    Object.entries(votes).forEach(([userId, vote]) => {
+      votesByChoicesTemp[vote.choice].push({ id: userId, x: vote.x, y: vote.y })
     })
+    votesByChoices = votesByChoicesTemp
+  }
 
-    // console.log("Current data ", entries)
+  const unsub = onSnapshot(roomRef, (querySnapshot) => {
+    room = querySnapshot.data() as Room
+    console.log({ room })
+    // const entries: Record<string, { x: number; y: number; value: boolean }> = {}
+    // const t: Array<{ x: number; y: number; id: string }> = []
+    // const nt: Array<{ x: number; y: number; id: string }> = []
 
-    Object.entries(entries).forEach(([id, entry]) => {
-      const { x, y, value } = entry
+    // querySnapshot.forEach((doc) => {
+    //   Object.entries(doc.data()).forEach(([id, values]) => {
+    //     entries[id] = { id, ...values }
+    //   })
+    // })
 
-      if (value) {
-        t.push({ x, y, id })
-      } else {
-        nt.push({ x, y, id })
-      }
-    })
+    // // console.log("Current data ", entries)
 
-    troublesomeEntries = t
-    notTroublesomeEntries = nt
+    // Object.entries(entries).forEach(([id, entry]) => {
+    //   const { x, y, value } = entry
+
+    //   if (value) {
+    //     t.push({ x, y, id })
+    //   } else {
+    //     nt.push({ x, y, id })
+    //   }
+    // })
+
+    // troublesomeEntries = t
+    // notTroublesomeEntries = nt
   })
 
   // Active for 5 minutes only, to save quotas,
@@ -137,41 +139,38 @@
 </script>
 
 <!-- <Kofi name="narze" label="Support Me" /> -->
-<!-- <Menu items={menuItems} /> -->
+<Menu items={menuItems} />
 <Social {url} {title} />
 <Head {title} {description} {url} {imageUrl} {gtagId} />
 
 <main class="w-full h-screen p-2 flex flex-col items-center">
   <h1 class="inline-block text-3xl sm:text-4xl md:text-6xl flex gap-3 mt-2 text-center">
-    สร้างความ<span class="underline text-red-600">เดือดร้อน</span>หรือไม่
+    Sticker Vote
   </h1>
+
+  <h2 class="text-xl">Room: {room.name}</h2>
+  <h2 class="text-xl">Page: {page.name}</h2>
 
   <!-- <div class="fixed">x: {x}, y: {y}, value: {value}</div> -->
 
   <div class="flex-grow w-full flex flex-col md:flex-row">
-    <div class="flex-grow text-center flex flex-col">
-      <p class="z-10 underline text-red-600 text-xl mt-4">เดือดร้อน</p>
-      <div on:click={submitIsTroublesome} class="flex-grow mt-4 relative">
-        {#each troublesomeEntries as entry (entry.id)}
-          <div class="sticker absolute" style={`top: ${entry.y}%; left: ${entry.x}%; `}>
-            <!-- {entry.id} -->
-          </div>
-        {/each}
+    {#each choices as choice, idx}
+      {@const votes = votesByChoices[choice]}
+      {#if idx > 0}
+        <span class="h-0.5 w-full md:w-0.5 md:h-full bg-black md:mt-14" />
+      {/if}
+      <div class="flex-grow text-center flex flex-col">
+        <p class="z-10 underline text-red-600 text-xl mt-4">{choice}</p>
+        <p class="z-10 mb-2 text-lg">{troublesomeEntries.length}</p>
+        <div on:click={submitIsTroublesome} class="flex-grow mt-4 relative">
+          {#each votes as vote (vote.id)}
+            <div class="sticker absolute" style={`top: ${vote.y}%; left: ${vote.x}%; `}>
+              <!-- {entry.id} -->
+            </div>
+          {/each}
+        </div>
       </div>
-      <p class="z-10">{troublesomeEntries.length}</p>
-    </div>
-    <span class="h-0.5 w-full md:w-0.5 md:h-full bg-black md:mt-14" />
-    <div class="flex-grow text-center flex flex-col">
-      <p class="z-10 underline text-red-600 text-xl mt-4">ไม่เดือดร้อน</p>
-      <div on:click={submitIsNotTroublesome} class="flex-grow mt-4 relative">
-        {#each notTroublesomeEntries as entry (entry.id)}
-          <div class="sticker absolute" style={`top: ${entry.y}%; left: ${entry.x}%; `}>
-            <!-- {entry.id} -->
-          </div>
-        {/each}
-      </div>
-      <p class="z-10">{notTroublesomeEntries.length}</p>
-    </div>
+    {/each}
   </div>
 </main>
 
