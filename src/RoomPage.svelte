@@ -65,11 +65,11 @@
     unsub()
   })
 
-  // Active for 10 minutes only, to save quotas,
+  // Active for 10 minutes only if no interaction, to save quotas,
   setTimeout(() => {
     active = false
     unsub()
-  }, 10 * 60 * 1000)
+  }, 60 * 60 * 1000)
 
   function prevPage() {
     if (!hasPrevPage) return
