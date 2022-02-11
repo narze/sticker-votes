@@ -7,8 +7,9 @@
   import Menu from "./lib/Menu.svelte"
   import Social from "./lib/Social.svelte"
   import { db } from "./lib/firebase"
-  import { collection, onSnapshot, doc, query, limit, setDoc } from "firebase/firestore"
+  import { collection, onSnapshot, doc, query, limit, setDoc, updateDoc } from "firebase/firestore"
   import { nanoid } from "nanoid"
+  import { onDestroy } from "svelte"
 
   const url = "https://sticker-vote.vercel.app"
   const title = "Sticker Vote"
@@ -49,31 +50,10 @@
 
   const unsub = onSnapshot(roomRef, (querySnapshot) => {
     room = querySnapshot.data() as Room
-    console.log({ room })
-    // const entries: Record<string, { x: number; y: number; value: boolean }> = {}
-    // const t: Array<{ x: number; y: number; id: string }> = []
-    // const nt: Array<{ x: number; y: number; id: string }> = []
+  })
 
-    // querySnapshot.forEach((doc) => {
-    //   Object.entries(doc.data()).forEach(([id, values]) => {
-    //     entries[id] = { id, ...values }
-    //   })
-    // })
-
-    // // console.log("Current data ", entries)
-
-    // Object.entries(entries).forEach(([id, entry]) => {
-    //   const { x, y, value } = entry
-
-    //   if (value) {
-    //     t.push({ x, y, id })
-    //   } else {
-    //     nt.push({ x, y, id })
-    //   }
-    // })
-
-    // troublesomeEntries = t
-    // notTroublesomeEntries = nt
+  onDestroy(() => {
+    unsub()
   })
 
   // Active for 5 minutes only, to save quotas,
@@ -82,7 +62,7 @@
     unsub()
   }, 5 * 60 * 1000)
 
-  async function submitIsTroublesome(e) {
+  async function submitVote(e, choice: string) {
     if (!active) {
       return
     }
@@ -90,41 +70,17 @@
     const rect = e.target.getBoundingClientRect()
     x = ((e.clientX - rect.left) / rect.width) * 100
     y = ((e.clientY - rect.top) / rect.height) * 100
-    value = true
 
-    await upsert()
-
-    alert("ขอบคุณสำหรับการโหวต!")
-
-    // active = false
-  }
-
-  async function submitIsNotTroublesome(e) {
-    if (!active) {
-      return
-    }
-
-    const rect = e.target.getBoundingClientRect()
-    x = ((e.clientX - rect.left) / rect.width) * 100
-    y = ((e.clientY - rect.top) / rect.height) * 100
-    value = false
-
-    await upsert()
+    await upsert(choice)
 
     alert("ขอบคุณสำหรับการโหวต!")
-
-    // active = false
   }
 
-  async function upsert() {
+  async function upsert(choice) {
     try {
-      await setDoc(
-        docRef,
-        {
-          [id]: { x: round(x), y: round(y), value },
-        },
-        { merge: true }
-      )
+      await updateDoc(roomRef, {
+        [`pages.${pageIndex}.votes.${id}`]: { x: round(x), y: round(y), choice },
+      })
 
       // console.log("Document upserted with ID: ", id, { x, y, value })
     } catch (e) {
@@ -148,7 +104,7 @@
     Sticker Vote
   </h1>
 
-  <h2 class="text-xl">Room: {room.name}</h2>
+  <h2 class="text-2xl">Room: {room.name}</h2>
   <h2 class="text-xl">Page: {page.name}</h2>
 
   <!-- <div class="fixed">x: {x}, y: {y}, value: {value}</div> -->
@@ -162,7 +118,7 @@
       <div class="flex-grow text-center flex flex-col">
         <p class="z-10 underline text-red-600 text-xl mt-4">{choice}</p>
         <p class="z-10 mb-2 text-lg">{troublesomeEntries.length}</p>
-        <div on:click={submitIsTroublesome} class="flex-grow mt-4 relative">
+        <div on:click={(e) => submitVote(e, choice)} class="flex-grow mt-4 relative">
           {#each votes as vote (vote.id)}
             <div class="sticker absolute" style={`top: ${vote.y}%; left: ${vote.x}%; `}>
               <!-- {entry.id} -->
