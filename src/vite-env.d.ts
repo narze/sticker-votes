@@ -12,10 +12,11 @@ interface Rooms {
 interface Room {
   name: string
   pages: Pages
+  admins: string[]
 }
 
 interface Pages {
-  [pageKey: string]: Page
+  [pageKey: any]: Page
 }
 
 interface Page {

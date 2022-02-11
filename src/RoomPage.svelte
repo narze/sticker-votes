@@ -13,26 +13,24 @@
 
   export let roomKey = "SNfjJdRJGeM2lfDN27vz-test"
 
-  const url = "https://sticker-vote.vercel.app"
-  const title = "Sticker Vote"
+  const url = "https://sticker-votes.vercel.app"
+  const title = "Sticker Votes"
 
-  const localStorageKey = "sticker-vote"
+  const localStorageKey = "sticker-votes"
 
-  const menuItems = [{ name: "Github", url: "https://github.com/narze/sticker-vote" }]
+  const menuItems = [{ name: "Github", url: "https://github.com/narze/sticker-votes" }]
 
   const description = ""
   const imageUrl =
-    "https://raw.githubusercontent.com/narze/timelapse/master/projects/sticker-vote_home.png"
+    "https://raw.githubusercontent.com/narze/timelapse/master/projects/sticker-votes_home.png"
   const gtagId = null
   const id = localStorage.getItem(localStorageKey) || nanoid()
 
   localStorage.setItem(localStorageKey, id)
 
-  let x, y, value
-  let troublesomeEntries: Array<{ x: number; y: number; id: string }> = []
-  let notTroublesomeEntries: Array<{ x: number; y: number; id: string }> = []
+  let x, y
   let active = true
-  let room: Room = { name: "Loading...", pages: {} }
+  let room: Room = { name: "Loading...", pages: {}, admins: [] }
   let pageIndex = 0
   let votesByChoices: Record<string, Array<{ id: string; x: number; y: number }>> = {}
   let roomRef = doc(db, "rooms", roomKey)
@@ -44,7 +42,7 @@
     const votesByChoicesTemp = {}
     choices.forEach((choice) => (votesByChoicesTemp[choice] = []))
     Object.entries(votes).forEach(([userId, vote]) => {
-      votesByChoicesTemp[vote.choice].push({ id: userId, x: vote.x, y: vote.y })
+      votesByChoicesTemp[vote.choice]?.push({ id: userId, x: vote.x, y: vote.y })
     })
     votesByChoices = votesByChoicesTemp
   }
@@ -52,9 +50,15 @@
   $: pageCount = Object.entries(room.pages).length
   $: hasPrevPage = pageIndex > 0
   $: hasNextPage = pageIndex < pageCount - 1
+  $: isAdmin = (room?.admins || []).includes(id)
 
   const unsub = onSnapshot(roomRef, (querySnapshot) => {
     room = querySnapshot.data() as Room
+
+    if (!room) {
+      alert("Room not found!")
+      window.location.href = "/"
+    }
   })
 
   onDestroy(() => {
@@ -121,7 +125,10 @@
     Sticker Votes
   </h1>
 
-  <h2 class="text-2xl">Room: {room.name}</h2>
+  <h2 class="text-2xl">
+    Room: {room.name}
+    {#if isAdmin}(Admin){/if}
+  </h2>
   <h2 class="text-xl">
     {#if hasPrevPage}<button class="text-red-700 text-3xl" on:click={prevPage}>◀</button>{/if}
     {page.name}
